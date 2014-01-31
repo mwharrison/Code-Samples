@@ -1,6 +1,17 @@
 '''
-This is the function I use to get dat from the Zillow API
+This is the function I use to get data from the Zillow API, it lives
 '''
+
+import xml.etree.ElementTree as ET
+import json
+
+from django.http import HttpResponse
+
+import requests
+from rentolize.unit.models import Unit
+from rentolize.unit.forms import UnitForm
+from rentolize.profile.functions import get_or_create_user_profile
+
 
 def zillow_data(request, address, postcode):
     zillow_api = 'http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=X1-ZWz1bb8g6cexhn_4vl2o&address=' + address + '&citystatezip=' + postcode + '&rentzestimate=true'

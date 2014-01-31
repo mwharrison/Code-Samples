@@ -1,19 +1,12 @@
 # -*- coding: utf-8; mode: django -*-
-
-'''
-One of the more complex Django models I have built for a large application at Rice.
-'''
-
-
-import reversion
-from reversion.revisions import revision_context_manager
 from datetime import datetime
 
 from django.db import models
-from django_fsm.db.fields import FSMField, transition
-
 from ws.emailtemplates.models import Template as EmailTemplate
 
+import reversion
+from reversion.revisions import revision_context_manager
+from django_fsm.db.fields import FSMField, transition
 from riceuser.models import UserProfile, Department
 from annual.functions import lazyproperty, get_object_or_none, add_to_revision
 
@@ -61,12 +54,12 @@ class AnnualReport(models.Model):
         PLAN_SUBMITTED = 'M'
         CANT_MANAGED = 'C'
 
-    STATUS_CHOICES = ((STATUS.UNSUBMITTED,'Unsubmitted'),
-                      (STATUS.REVISING,'Revising'),
-                      (STATUS.PENDING,'Pending Review'),
-                      (STATUS.NO_CONFLICTS,'Finalized (No Conflicts)'),
+    STATUS_CHOICES = ((STATUS.UNSUBMITTED, 'Unsubmitted'),
+                      (STATUS.REVISING, 'Revising'),
+                      (STATUS.PENDING, 'Pending Review'),
+                      (STATUS.NO_CONFLICTS, 'Finalized (No Conflicts)'),
                       (STATUS.COMMITTEE_REVIEW, 'Pending Committee Review'),
-                      (STATUS.PLAN_SUBMITTED,'Finalized (Management Plan Submitted)'),
+                      (STATUS.PLAN_SUBMITTED, 'Finalized (Management Plan Submitted)'),
                       (STATUS.CANT_MANAGED, 'Finalized (Conflicts Cannot Be Managed)'),)
 
     user = models.ForeignKey(UserProfile)
@@ -77,9 +70,11 @@ class AnnualReport(models.Model):
     have_conflict_income = models.BooleanField()
     have_conflict_activities = models.BooleanField()
     have_travel_activities = models.BooleanField()
-    
-    committee_member_1 = models.ForeignKey(UserProfile, related_name='committee_member_1', blank=True, null=True, default=None)
-    committee_member_2 = models.ForeignKey(UserProfile, related_name='committee_member_2', blank=True, null=True, default=None)
+
+    committee_member_1 = models.ForeignKey(UserProfile, related_name='committee_member_1', blank=True, null=True,
+                                           default=None)
+    committee_member_2 = models.ForeignKey(UserProfile, related_name='committee_member_2', blank=True, null=True,
+                                           default=None)
 
     status = FSMField(max_length=1, choices=STATUS_CHOICES, default=STATUS.UNSUBMITTED)
     created = models.DateTimeField(auto_now_add=True)
@@ -88,25 +83,26 @@ class AnnualReport(models.Model):
     @property
     def have_conflicts(self):
         return self.have_conflict_income \
-            or self.have_conflict_activities \
-            or self.have_travel_activities \
+                   or self.have_conflict_activities \
+                   or self.have_travel_activities \
             or self.have_gift
 
     @lazyproperty
     def submission(self):
         return ReportSubmission.objects.exclude(status=ReportSubmission.STATUS.REJECTED).get(report=self)
-    
+
     @lazyproperty
     def season(self):
         return get_object_or_none(ReportingSeason, year=self.year)
 
     @property
     def is_editable(self):
-        return self.status in [ AnnualReport.STATUS.UNSUBMITTED,
-                                    AnnualReport.STATUS.REVISING ]
-    
+        return self.status in [AnnualReport.STATUS.UNSUBMITTED,
+                               AnnualReport.STATUS.REVISING]
+
     def __unicode__(self):
-        return u"%s, %s %s (%s)" % (self.user.user.last_name,self.user.user.first_name,self.year,self.get_status_display())
+        return u"%s, %s %s (%s)" % (
+            self.user.user.last_name, self.user.user.first_name, self.year, self.get_status_display())
 
     def is_interim_open(self, today=None):
         """
@@ -126,33 +122,34 @@ class AnnualReport(models.Model):
 
     def can_be_submitted(self):
         income_done = not self.have_conflict_income \
-                      or bool(self.incomeconflict_set.all())
+            or bool(self.incomeconflict_set.all())
 
         activities_done = not self.have_conflict_activities \
-                          or bool(self.consultingconflict_set.all())
+            or bool(self.consultingconflict_set.all())
 
         travel_done = not self.have_travel_activities \
-                      or bool(self.travelconflict_set.all())
+            or bool(self.travelconflict_set.all())
 
         return self.status in AnnualReport.STATUS.UNSUBMITTED \
-               and income_done and activities_done and travel_done
+                   and income_done and activities_done and travel_done
 
     def need_revising(self):
         return self.status == AnnualReport.STATUS.REVISING
 
     def can_sent_to_revise(self):
-        return self.submission.status in [ ReportSubmission.STATUS.DEAN_REVIEW,
-                                           ReportSubmission.STATUS.OSR_REVIEW ]
+        return self.submission.status in [ReportSubmission.STATUS.DEAN_REVIEW,
+                                          ReportSubmission.STATUS.OSR_REVIEW]
 
     def can_be_revised(self):
-        return self.submission.status in [ ReportSubmission.STATUS.PENDING,
-                                           ReportSubmission.STATUS.PENDING_OSR ]
+        return self.submission.status in [ReportSubmission.STATUS.PENDING,
+                                          ReportSubmission.STATUS.PENDING_OSR]
+
     def can_has_conflict(self):
-        return self.submission.status in [ ReportSubmission.STATUS.DEAN_REVIEW,
-                                           ReportSubmission.STATUS.OSR_REVIEW_NO_CONFLICTS,
-                                           ReportSubmission.STATUS.OSR_REVIEW,
-                                           ReportSubmission.STATUS.OSR_REVIEW_USER_DOC,
-                                           ReportSubmission.STATUS.USER_INFO]
+        return self.submission.status in [ReportSubmission.STATUS.DEAN_REVIEW,
+                                          ReportSubmission.STATUS.OSR_REVIEW_NO_CONFLICTS,
+                                          ReportSubmission.STATUS.OSR_REVIEW,
+                                          ReportSubmission.STATUS.OSR_REVIEW_USER_DOC,
+                                          ReportSubmission.STATUS.USER_INFO]
 
     @transition(field=status, source=STATUS.UNSUBMITTED, target=STATUS.PENDING, conditions=[can_be_submitted])
     def submit(self):
@@ -181,7 +178,7 @@ class AnnualReport(models.Model):
         self.submission._dean_approve()
         self.submission.save()
 
-    @transition(field=status, source=STATUS.PENDING, conditions = [ can_has_conflict ])
+    @transition(field=status, source=STATUS.PENDING, conditions=[can_has_conflict])
     def has_conflict(self):
         if self.submission.status == ReportSubmission.STATUS.DEAN_REVIEW:
             self.submission._dean_conflict_found()
@@ -196,7 +193,7 @@ class AnnualReport(models.Model):
         else:
             raise NotImplementedError('Unknown submission state for has_conflict')
         self.submission.save()
-    
+
     @transition(field=status, source=STATUS.PENDING, target=STATUS.COMMITTEE_REVIEW)
     def members_selected(self):
         if self.submission.status == ReportSubmission.STATUS.OSR_REVIEW_USER_DOC:
@@ -204,8 +201,8 @@ class AnnualReport(models.Model):
         else:
             raise NotImplementedError('Unknown submission state for members_selected')
         self.submission.save()
-            
-    @transition(field=status, source=STATUS.PENDING, target=STATUS.REVISING, conditions=[ can_sent_to_revise ])
+
+    @transition(field=status, source=STATUS.PENDING, target=STATUS.REVISING, conditions=[can_sent_to_revise])
     def revise(self):
         """
         Return report for faculty member revising
@@ -218,7 +215,7 @@ class AnnualReport(models.Model):
             raise NotImplementedError('Unknown submission status for revise')
         self.submission.save()
 
-    @transition(field=status, source=STATUS.REVISING, target=STATUS.PENDING, conditions=[ can_be_revised ])
+    @transition(field=status, source=STATUS.REVISING, target=STATUS.PENDING, conditions=[can_be_revised])
     def revised(self):
         """
         Done information editing
@@ -230,7 +227,7 @@ class AnnualReport(models.Model):
         else:
             raise NotImplementedError('Unknown submission status for revise')
         self.submission.save()
-        
+
     @transition(field=status, source=STATUS.COMMITTEE_REVIEW, target=STATUS.PENDING)
     def committee_done(self):
         """
@@ -239,16 +236,16 @@ class AnnualReport(models.Model):
         if self.submission.status == ReportSubmission.STATUS.COMMITTEE_REVIEW:
             self.submission._committee_done()
         else:
-            raise NotImplementedError('Unknown submission status for management change') 
-              
+            raise NotImplementedError('Unknown submission status for management change')
+
         self.submission.save()
-        
+
     def management_plan_required(self):
         if self.submission.status == ReportSubmission.STATUS.OSR_FINAL_REVIEW:
             self.submission._management_plan_required()
         else:
-            raise NotImplementedError('Unknown submission status for management change') 
-              
+            raise NotImplementedError('Unknown submission status for management change')
+
         self.submission.save()
 
     @transition(field=status, source=STATUS.PENDING, target=STATUS.NO_CONFLICTS)
@@ -275,7 +272,7 @@ class AnnualReport(models.Model):
         self.submission._cant_manage()
         self.submission.save()
 
-    def save_with_revision(self, author=None):        
+    def save_with_revision(self, author=None):
         revision_context_manager.start()
         if author:
             revision_context_manager.set_user(author)
@@ -309,11 +306,10 @@ class AnnualReport(models.Model):
 
     class Meta:
         unique_together = ('user', 'year')
-        permissions = [ ('can_view_all_reports', 'Can view all reports'),
-                        ('can_search_reports', 'Can search reports'),
-                        ('can_make_osr_review', 'Can make OSR review'),
-                        ('can_make_committee_recommendation', 'Can make committee recommendation') ]
-
+        permissions = [('can_view_all_reports', 'Can view all reports'),
+                       ('can_search_reports', 'Can search reports'),
+                       ('can_make_osr_review', 'Can make OSR review'),
+                       ('can_make_committee_recommendation', 'Can make committee recommendation')]
 
 
 class ReportSubmission(models.Model):
@@ -419,25 +415,25 @@ class ReportSubmission(models.Model):
         """
         OSR found conflict not identified by dean, sending back
         """
-        
+
     @transition(field=status, source=STATUS.OSR_REVIEW, target=STATUS.USER_INFO)
     def _info_requested(self):
         """
         OSR found conflicts, need to get info from user
         """
-    
+
     @transition(field=status, source=STATUS.USER_INFO, target=STATUS.OSR_REVIEW_USER_DOC)
     def _info_submitted(self):
         """
         User submits information - return to OSR for review
         """
-    
+
     @transition(field=status, source=STATUS.OSR_REVIEW_USER_DOC, target=STATUS.USER_INFO)
     def _info_unacceptable(self):
         """
         Information not acceptable, return to user
         """
-        
+
     @transition(field=status, source=STATUS.OSR_REVIEW_USER_DOC, target=STATUS.PENDING_COMMITTEE)
     def _pending_committee(self):
         """
@@ -461,7 +457,7 @@ class ReportSubmission(models.Model):
         """
         Waiting for committee management plan
         """
-        
+
     @transition(field=status, source=STATUS.COMMITTEE_REVIEW, target=STATUS.CANT_MANAGE)
     def _cant_manage(self):
         """
@@ -469,9 +465,9 @@ class ReportSubmission(models.Model):
         """
 
     @transition(field=status,
-                source=[ STATUS.OSR_REVIEW,
-                         STATUS.OSR_REVIEW_NO_CONFLICTS,
-                         STATUS.COMMITTEE_MANAGEMENT ],
+                source=[STATUS.OSR_REVIEW,
+                        STATUS.OSR_REVIEW_NO_CONFLICTS,
+                        STATUS.COMMITTEE_MANAGEMENT],
                 target=STATUS.ACCEPTED)
     def _accept(self):
         """
@@ -480,8 +476,8 @@ class ReportSubmission(models.Model):
         self.date_resolved = datetime.now()
 
     def __unicode__(self):
-        return "%s submitted on %s (%s)" % (self.report.user.user, self.date_submitted,self.get_status_display())
-    
+        return "%s submitted on %s (%s)" % (self.report.user.user, self.date_submitted, self.get_status_display())
+
     class Meta:
         get_latest_by = 'date_submitted'
 
@@ -494,25 +490,28 @@ class IncomeConflict(models.Model):
         HIGH = '4'
         VERY_HIGH = '5'
         NOT_DETERMINABLE = '6'
-        
+
     INCOME_CHOICES = ((INCOME.LOW, '$0-4,999'),
                       (INCOME.MID, '$5,000 - 9,999'),
                       (INCOME.MID_HIGH, '$10,000 - 19,000'),
                       (INCOME.HIGH, '$20,000 - 100,000'),
                       (INCOME.VERY_HIGH, 'Above $100,000'),
-                      (INCOME.NOT_DETERMINABLE, 'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
-        
+                      (INCOME.NOT_DETERMINABLE,
+                       'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
+
     report = models.ForeignKey(AnnualReport)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     transferred = models.BooleanField()
     entity_name = models.CharField(max_length=250)
-    
+
     estimated_income = models.CharField(max_length=1, choices=INCOME_CHOICES)
     income_by_twenty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00", blank=True, null=True)
+                                           help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00",
+                                           blank=True, null=True)
     income_by_fifty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00", blank=True, null=True)
+                                          help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00",
+                                          blank=True, null=True)
 
     is_univercity_sponsor = models.BooleanField()
     contribute = models.BooleanField()
@@ -528,7 +527,7 @@ class IncomeConflict(models.Model):
     income_travel_funds = models.BooleanField()
     income_other = models.BooleanField()
     income_other_description = models.TextField(blank=True)
-    
+
     have_sponsor_research = models.BooleanField()
     sponsor_research_description = models.TextField(blank=True)
 
@@ -546,22 +545,23 @@ class IncomeConflict(models.Model):
 
     other_involved = models.BooleanField()
     involving_description = models.TextField(blank=True)
-    
+
     existing_research_relation = models.BooleanField()
     existing_research_relation_description = models.TextField(blank=True)
-    
+
     perceived_coi = models.BooleanField()
     perceived_coi_description = models.TextField(blank=True)
-    
+
     additional_info = models.BooleanField()
     additional_info_description = models.TextField(blank=True)
-    
+
     existing_management_plan = models.BooleanField()
     management_plan_description = models.TextField(blank=True)
 
 
     def __unicode__(self):
-        return u"%s" % self.report.user 
+        return u"%s" % self.report.user
+
 
 class GiftConflict(models.Model):
     class INCOME:
@@ -571,25 +571,28 @@ class GiftConflict(models.Model):
         HIGH = '4'
         VERY_HIGH = '5'
         NOT_DETERMINABLE = '6'
-        
+
     INCOME_CHOICES = ((INCOME.LOW, '$0-4,999'),
                       (INCOME.MID, '$5,000 - 9,999'),
                       (INCOME.MID_HIGH, '$10,000 - 19,000'),
                       (INCOME.HIGH, '$20,000 - 100,000'),
                       (INCOME.VERY_HIGH, 'Above $100,000'),
-                      (INCOME.NOT_DETERMINABLE, 'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
-        
+                      (INCOME.NOT_DETERMINABLE,
+                       'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
+
     report = models.ForeignKey(AnnualReport)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     transferred = models.BooleanField()
     entity_name = models.CharField(max_length=250)
-    
+
     estimated_income = models.CharField(max_length=1, choices=INCOME_CHOICES)
     income_by_twenty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00", blank=True, null=True)
+                                           help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00",
+                                           blank=True, null=True)
     income_by_fifty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00", blank=True, null=True)
+                                          help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00",
+                                          blank=True, null=True)
 
     is_univercity_sponsor = models.BooleanField()
     contribute = models.BooleanField()
@@ -605,7 +608,7 @@ class GiftConflict(models.Model):
     income_travel_funds = models.BooleanField()
     income_other = models.BooleanField()
     income_other_description = models.TextField(blank=True)
-    
+
     have_sponsor_research = models.BooleanField()
     sponsor_research_description = models.TextField(blank=True)
 
@@ -623,16 +626,16 @@ class GiftConflict(models.Model):
 
     other_involved = models.BooleanField()
     involving_description = models.TextField(blank=True)
-    
+
     existing_research_relation = models.BooleanField()
     existing_research_relation_description = models.TextField(blank=True)
-    
+
     perceived_coi = models.BooleanField()
     perceived_coi_description = models.TextField(blank=True)
-    
+
     additional_info = models.BooleanField()
     additional_info_description = models.TextField(blank=True)
-    
+
     existing_management_plan = models.BooleanField()
     management_plan_description = models.TextField(blank=True)
 
@@ -640,8 +643,8 @@ class GiftConflict(models.Model):
     def __unicode__(self):
         return u"%s" % self.report.user
 
-class BusinessConflict(models.Model):
 
+class BusinessConflict(models.Model):
     class VALUE:
         LOW = '0'
         MID = '2'
@@ -649,18 +652,20 @@ class BusinessConflict(models.Model):
         HIGH = '4'
         VERY_HIGH = '5'
         NOT_DETERMINABLE = '6'
-        
+
     VALUE_CHOICES = ((VALUE.LOW, '$0-4,999'),
-                      (VALUE.MID, '$5,000 - 9,999'),
-                      (VALUE.MID_HIGH, '$10,000 - 19,000'),
-                      (VALUE.HIGH, '$20,000 - 100,000'),
-                      (VALUE.VERY_HIGH, 'Above $100,000'),
-                      (VALUE.NOT_DETERMINABLE, 'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
-                      
+                     (VALUE.MID, '$5,000 - 9,999'),
+                     (VALUE.MID_HIGH, '$10,000 - 19,000'),
+                     (VALUE.HIGH, '$20,000 - 100,000'),
+                     (VALUE.VERY_HIGH, 'Above $100,000'),
+                     (VALUE.NOT_DETERMINABLE,
+                      'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
+
     class INTEREST:
         EQUITY = 'E'
         PARTNERSHIP = 'P'
         OTHER = 'O'
+
     INTEREST_CHOICES = ((INTEREST.EQUITY, 'Equity'),
                         (INTEREST.PARTNERSHIP, 'Partnership'),
                         (INTEREST.OTHER, 'Other'))
@@ -672,13 +677,15 @@ class BusinessConflict(models.Model):
     entity_name = models.CharField(max_length=250)
 
     org_type = models.CharField(max_length=50)
-    
+
     estimated_value = models.CharField(max_length=1, choices=VALUE_CHOICES)
     valuation_by_twenty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00", blank=True, null=True)
+                                              help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00",
+                                              blank=True, null=True)
     valuation_by_fifty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00", blank=True, null=True)
-        
+                                             help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00",
+                                             blank=True, null=True)
+
     estimated_days_spent = models.CharField(max_length=250)
 
     ownership_pct = models.CharField(max_length=250)
@@ -704,13 +711,13 @@ class BusinessConflict(models.Model):
 
     other_involved = models.BooleanField()
     involving_description = models.TextField(blank=True)
-    
+
     existing_research_relation = models.BooleanField()
     existing_research_relation_description = models.TextField(blank=True)
-    
+
     perceived_coi = models.BooleanField()
     perceived_coi_description = models.TextField(blank=True)
-    
+
     additional_info = models.BooleanField()
     additional_info_description = models.TextField(blank=True)
 
@@ -721,11 +728,10 @@ class BusinessConflict(models.Model):
     rice_contributor = models.BooleanField()
 
     def __unicode__(self):
-        return u"%s" % self.report.user 
+        return u"%s" % self.report.user
 
 
 class ConsultingConflict(models.Model):
-
     class INCOME:
         LOW = '0'
         MID = '2'
@@ -733,14 +739,15 @@ class ConsultingConflict(models.Model):
         HIGH = '4'
         VERY_HIGH = '5'
         NOT_DETERMINABLE = '6'
-        
+
     INCOME_CHOICES = ((INCOME.LOW, '$0-4,999'),
                       (INCOME.MID, '$5,000 - 9,999'),
                       (INCOME.MID_HIGH, '$10,000 - 19,000'),
                       (INCOME.HIGH, '$20,000 - 100,000'),
                       (INCOME.VERY_HIGH, 'Above $100,000'),
-                      (INCOME.NOT_DETERMINABLE, 'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
-                      
+                      (INCOME.NOT_DETERMINABLE,
+                       'The interest is one whose value cannot be readily determined through reference to public prices or other reasonable measures of fair market value.'))
+
     report = models.ForeignKey(AnnualReport)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -750,9 +757,11 @@ class ConsultingConflict(models.Model):
     estimated_days_spent = models.CharField(max_length=250)
     estimated_income = models.CharField(max_length=1, choices=INCOME_CHOICES)
     income_by_twenty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00", blank=True, null=True)
+                                           help_text="Enter the value as a decimal number without extra punctuation in multiples of $20,000: 60000.00",
+                                           blank=True, null=True)
     income_by_fifty = models.DecimalField(decimal_places=2, max_digits=11,
-        help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00", blank=True, null=True)
+                                          help_text="Enter the value as a decimal number without extra punctuation in multiples of $50,000: 150000.00",
+                                          blank=True, null=True)
 
     rice_resources_use = models.BooleanField()
 
@@ -765,7 +774,7 @@ class ConsultingConflict(models.Model):
     involving_description = models.TextField(blank=True)
 
     description = models.TextField()
-    
+
     have_sponsor_research = models.BooleanField()
     sponsor_research_description = models.TextField(blank=True)
 
@@ -777,23 +786,22 @@ class ConsultingConflict(models.Model):
 
     have_agreement = models.BooleanField()
     agreement_description = models.TextField(blank=True)
-    
+
     existing_research_relation = models.BooleanField()
     existing_research_relation_description = models.TextField(blank=True)
-    
+
     perceived_coi = models.BooleanField()
     perceived_coi_description = models.TextField(blank=True)
-    
+
     additional_info = models.BooleanField()
     additional_info_description = models.TextField(blank=True)
-    
+
     existing_management_plan = models.BooleanField()
     management_plan_description = models.TextField(blank=True)
 
 
-
     def __unicode__(self):
-        return u"%s" % self.report.user 
+        return u"%s" % self.report.user
 
 
 class TravelConflict(models.Model):
@@ -805,15 +813,17 @@ class TravelConflict(models.Model):
     estimated_days_spent = models.CharField(max_length=100)
     destination = models.CharField(max_length=100)
     purpose = models.TextField()
-    
+
     existing_research_relation = models.BooleanField()
     existing_research_relation_description = models.TextField(blank=True)
 
     def __unicode__(self):
-        return u"%s" % self.report.user 
+        return u"%s" % self.report.user
 
-#
-# Workflow data
+        #
+
+        # Workflow data
+
 #
 class ActionLog(models.Model):
     class ACTION:
@@ -831,6 +841,7 @@ class ActionLog(models.Model):
         DONE_NO_CONFLICTS = 'DNC'
         DONE_WITH_MANAGEMENT_PLAN = 'DMP'
         DONE_CANT_BE_MANAGED = 'DCM'
+
     ACTION_CHOICES = ((ACTION.SUBMIT, 'Submitted'),
                       (ACTION.REJECT, 'Rejected'),
                       (ACTION.APPROVE, 'Approved'),
@@ -852,12 +863,12 @@ class ActionLog(models.Model):
     text = models.TextField(blank=True, default="")
     private = models.TextField(blank=True, default="")
     sent = models.DateTimeField(auto_now_add=True)
-    
+
     signature = models.CharField(max_length=250, default="", blank=True)
 
     class Meta:
         get_latest_by = 'sent'
-    
+
     def __unicode__(self):
         return "%s" % self.action
 
@@ -881,16 +892,19 @@ class Reminder(models.Model):
     class Meta:
         get_latest_by = 'sent'
 
+
 class CommitteeUpload(models.Model):
     member = models.ForeignKey(UserProfile)
     report = models.ForeignKey(AnnualReport)
     document = models.FileField(upload_to='committee/')
 
+
 class ManagementPlan(models.Model):
     created_by = models.ForeignKey(UserProfile)
     report = models.ForeignKey(AnnualReport)
     plan = models.FileField(upload_to='management_plans/')
-    
+
+
 reversion.register(IncomeConflict)
 reversion.register(GiftConflict)
 reversion.register(BusinessConflict)
