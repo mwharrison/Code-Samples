@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CreateJiraTicketConfiguration">
+    <option name="jiraUrl" value="https://docs.rice.edu/jira" />
+    <option name="password" value="harri39917" />
+    <option name="project" value="" />
+    <option name="username" value="mwh5" />
+  </component>
+</project>
+

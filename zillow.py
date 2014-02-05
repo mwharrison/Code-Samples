@@ -14,7 +14,7 @@ from rentolize.profile.functions import get_or_create_user_profile
 
 
 def zillow_data(request, address, postcode):
-    zillow_api = 'http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=X1-ZWz1bb8g6cexhn_4vl2o&address=' + address + '&citystatezip=' + postcode + '&rentzestimate=true'
+    zillow_api = 'http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=X&address=' + address + '&citystatezip=' + postcode + '&rentzestimate=true'
     zillow_api = zillow_api.replace("#", "")
     r = requests.get(zillow_api)
     root = ET.fromstring(r.content)
